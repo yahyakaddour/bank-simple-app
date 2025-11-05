@@ -19,12 +19,20 @@ pipeline {
                 script {
                     docker.image('python:3.11').inside('-u root') {
                         sh '''
+                            apt-get update && apt-get install -y wget unzip openjdk-17-jre
+                            
+                            # Install Bandit
                             pip install bandit
                             mkdir -p reports
                             bandit -r . -f html -o reports/bandit-report.html || true
 
-                            # SonarQube scan
-                            sonar-scanner \
+                            # Download and install SonarScanner
+                            wget -q -O sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                            unzip -q sonar-scanner.zip -d /opt/
+                            export PATH=$PATH:/opt/sonar-scanner-5.0.1.3006-linux/bin
+
+                            # Run SonarScanner
+                            /opt/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner \
                                 -Dsonar.projectKey=PythonApp \
                                 -Dsonar.sources=. \
                                 -Dsonar.host.url=${SONAR_HOST_URL} \
@@ -61,7 +69,6 @@ pipeline {
         stage('Dynamic Analysis (OWASP ZAP)') {
             steps {
                 script {
-                    // Make sure OWASP ZAP is installed in Jenkins machine
                     sh '''
                         mkdir -p reports
                         zap-baseline.py -t http://localhost:5000 -r reports/owasp-zap-report.html || true
@@ -83,7 +90,7 @@ pipeline {
 
             emailext (
                 to: "${RECIPIENT_EMAIL}",
-                subject: "Jenkins DevSecOps Pipeline - Build #${BUILD_NUMBER}",
+                subject: "Jenkins DevSecOps Pipeline - Build #${BUILD_NUMBER} (${currentBuild.currentResult})",
                 body: """
                 <h3>DevSecOps Pipeline Execution Report</h3>
                 <p>Status: ${currentBuild.currentResult}</p>
