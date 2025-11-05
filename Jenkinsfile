@@ -20,8 +20,12 @@ pipeline {
 
     stage('Static Code Analysis (Bandit + SonarQube)') {
       agent {
-        docker { image 'python:3.11' args '-u root' }
-      }
+         docker {
+            image 'python:3.11'
+            args '-u root'
+            }
+        }
+
       steps {
         sh '''
           pip install --no-cache-dir --root-user-action=ignore bandit 
