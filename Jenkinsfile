@@ -24,7 +24,7 @@ pipeline {
       }
       steps {
         sh '''
-          pip install bandit
+          pip install --no-cache-dir --break-system-packages bandit
           mkdir -p reports
           bandit -r . -f html -o reports/bandit-report.html
         '''
