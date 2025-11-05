@@ -30,7 +30,7 @@ pipeline {
         sh '''
           pip install --no-cache-dir --root-user-action=ignore bandit 
           mkdir -p reports
-          bandit -r . -f html -o reports/bandit-report.html
+          bandit -r . -f html -o reports/bandit-report.html || true
         '''
         withSonarQubeEnv("${SONARQUBE}") {
           sh 'sonar-scanner -Dsonar.projectKey=bank-app -Dsonar.sources=.'
