@@ -1,9 +1,14 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'python:3.11-slim'
+            args '-u root'
+        }
+    }
 
     environment {
         SONAR_HOST_URL = 'http://192.168.50.4:9000/'
-        SONAR_AUTH_TOKEN = credentials('sonarqube')  // Make sure this is the correct credentials ID
+        SONAR_AUTH_TOKEN = credentials('sonarqube')
     }
 
     stages {
@@ -15,52 +20,59 @@ pipeline {
 
         stage('Static Code Analysis (Bandit + SonarQube)') {
             steps {
-                // Bandit security scan
                 sh '''
-                    echo "Running Bandit static analysis..."
-                    pip install --user bandit
-                    bandit -r . -f html -o bandit-report.html || true
-                '''
+                    echo "Updating system..."
+                    apt-get update -y && apt-get install -y curl
 
-                // SonarQube scan via Jenkins plugin
-                withSonarQubeEnv('SonarQube') { // The name must match your Jenkins SonarQube configuration
+                    echo "Installing Bandit..."
+                    pip install bandit
+
+                    echo "Running Bandit static analysis..."
+                    mkdir -p reports
+                    bandit -r . -f html -o reports/bandit-report.html || true
+
+                    echo "Running SonarQube analysis via Jenkins plugin..."
+                '''
+                withSonarQubeEnv('SonarQube') {
                     sh '''
-                        echo "Running SonarQube analysis using Jenkins plugin..."
                         sonar-scanner \
                             -Dsonar.projectKey=PythonApp \
                             -Dsonar.projectName=PythonApp \
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=. \
-                            -Dsonar.python.version=3.11
+                            -Dsonar.python.version=3.11 \
+                            -Dsonar.host.url=$SONAR_HOST_URL \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN
                     '''
                 }
             }
         }
 
-        stage('Docker Build') {
+        stage('Build Docker Image') {
             steps {
                 sh '''
                     echo "Building Docker image..."
-                    docker build -t python-app:latest .
+                    docker build -t bankapp .
                 '''
             }
         }
 
-        stage('Dynamic Application Security Testing (OWASP ZAP)') {
+        stage('Deploy and Run App') {
+            steps {
+                sh '''
+                    echo "Running application container..."
+                    docker run -d --name bankapp -p 5000:5000 bankapp
+                '''
+            }
+        }
+
+        stage('Dynamic Analysis (OWASP ZAP)') {
             steps {
                 sh '''
                     echo "Starting OWASP ZAP scan..."
-                    docker run --rm -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-baseline.py \
-                        -t http://localhost:5000 -r zap-report.html || true
-                '''
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                sh '''
-                    echo "Deploying application..."
-                    docker run -d -p 5000:5000 python-app:latest
+                    zap-cli quick-scan --self-contained --start-options "-config api.disablekey=true" http://localhost:5000 || true
+                    mkdir -p reports
+                    zap-cli report -o reports/zap-report.html -f html || true
                 '''
             }
         }
@@ -68,12 +80,19 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: '*.html', allowEmptyArchive: true
+            sh '''
+                echo "Cleaning up..."
+                docker stop bankapp || true
+                docker rm bankapp || true
+            '''
+
+            archiveArtifacts artifacts: 'reports/*.html', allowEmptyArchive: true
+
             emailext(
-                subject: "DevSecOps Pipeline - ${currentBuild.currentResult}",
-                body: "The pipeline finished with status: ${currentBuild.currentResult}\nCheck attached reports.",
-                to: 'yahyakaddour5@gmail.com',
-                attachmentsPattern: '*.html'
+                subject: "Jenkins Pipeline Report: ${currentBuild.currentResult}",
+                body: "Hello,\n\nThe Jenkins DevSecOps pipeline has completed with status: ${currentBuild.currentResult}.\nReports are attached.\n\nBest,\nJenkins",
+                attachLog: true,
+                to: 'yahyakaddour5@gmail.com'
             )
         }
     }
