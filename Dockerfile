@@ -10,7 +10,13 @@ RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r re
 # Copy the entire app
 COPY . .
 
-# Expose the app port (change if needed)
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Expose the app port 
 EXPOSE 5000
 
 # Start the app
