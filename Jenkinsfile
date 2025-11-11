@@ -63,11 +63,7 @@ pipeline {
             post {
                 success {
                     echo 'Unit tests completed'
-                    publishHTML target: [
-                        reportDir: 'htmlcov',
-                        reportFiles: 'index.html',
-                        reportName: 'Coverage Report'
-                    ]
+                    archiveArtifacts artifacts: 'htmlcov/**', allowEmptyArchive: true
                 }
             }
         }
