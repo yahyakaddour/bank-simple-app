@@ -1,14 +1,37 @@
-# Use an official lightweight Python image
+# Multi-stage build for Flask Banking App
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Final stage
 FROM python:3.11-slim
 
-# Copy dependencies
-COPY requirements.txt .
+WORKDIR /app
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the entire app
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application files
 COPY . .
+
+# Set environment variables
+ENV PATH=/root/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    FLASK_APP=app.py
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
@@ -17,7 +40,7 @@ RUN useradd -m -u 1000 appuser && \
 
 USER appuser
 
-# Expose the app port 
+# Expose port
 EXPOSE 5000
 
 # Start the app
