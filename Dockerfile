@@ -1,5 +1,5 @@
 # Multi-stage build for Flask Banking App
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
@@ -36,7 +36,8 @@ ENV PATH=/root/.local/bin:$PATH \
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /root/.local
+    chown -R appuser:appuser /root/.local && \
+    ln -s /root/.local/bin/gunicorn /usr/local/bin/gunicorn
 
 USER appuser
 
