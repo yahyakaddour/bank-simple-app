@@ -121,7 +121,7 @@ pipeline {
                 echo "Scanning Python dependencies for vulnerabilities..."
                 sh '''
                     pip install pip-audit
-                    pip-audit --desc > pip-audit-report.txt 
+                    python3 -m pip-audit --desc > pip-audit-report.txt 
                 '''
             }
         }
