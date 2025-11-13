@@ -30,14 +30,16 @@ pipeline {
             }
         }
 
-        stage('BUILD') {
+        stage("BUILD") {
             steps {
                 echo "Installing Python dependencies..."
                 sh '''
-                    apt-get update && apt-get install -y python3-pip 
+                    set -e
+                    apt-get update && apt-get install -y python3 python3-pip
+
+                    # Upgrade pip and install dependencies
                     python3 -m pip install --upgrade pip
-                    pip install -r requirements.txt
-                    pip install pytest pytest-cov pylint flake8 bandit
+                    python3 -m pip install -r requirements.txt
                 '''
             }
             post {
@@ -47,11 +49,12 @@ pipeline {
             }
         }
 
-        stage('UNIT TEST') {
+        stage("UNIT TEST") {
             steps {
                 echo "Running unit tests with pytest..."
                 sh '''
-                    python3 -m pytest --cov=. --cov-report=xml --cov-report=html -v 
+                    set -e
+                    python3 -m pytest --cov=. --cov-report=xml --cov-report=html -v
                 '''
             }
             post {
@@ -62,36 +65,58 @@ pipeline {
             }
         }
 
-        stage('INTEGRATION TEST') {
+        stage("INTEGRATION TEST") {
             steps {
                 echo "Running integration tests and code quality checks..."
                 sh '''
-                    python3 -m pylint app.py --fail-under=7.0 --exit-zero
-                    python3 -m flake8 app.py --count --exit-zero --max-complexity=10 
+                    set -e
+                    # Pylint – fails if score < 6.5
+                    python3 -m pylint app.py --fail-under=6.5
+
+                    # Flake8 – report issues, but do not fail the build
+                    python3 -m flake8 app.py --count --max-complexity=10 --exit-zero
                 '''
             }
         }
 
-        stage('CODE ANALYSIS WITH BANDIT') {
-            steps {
-                echo "Running Bandit security analysis..."
-                sh '''
-                    python3 -m bandit -r . -f json -o bandit-report.json || true
-                    python3 -m bandit -r . -f txt -o bandit-report.txt || true
-                '''
-            }
-            post {
-                success {
-                    echo 'Bandit analysis completed'
-                }
+     stage('CODE ANALYSIS WITH BANDIT') {
+    steps {
+        script {
+            echo "Running Bandit security analysis..."
+            def banditStatus = sh(
+                script: '''
+                    python3 -m bandit -r . -f json -o bandit-report.json
+                    python3 -m bandit -r . -f txt -o bandit-report.txt
+                ''',
+                returnStatus: true
+            )
+
+            if (banditStatus == 0) {
+                echo "✅ Bandit: no issues found (exit code 0)."
+            } else if (banditStatus == 1) {
+                echo "⚠️ Bandit: security issues found (exit code 1)."
+                echo "   Check bandit-report.json / bandit-report.txt for details."
+                // We do NOT fail the pipeline here, just warn.
+            } else {
+                error "❌ Bandit failed with exit code ${banditStatus} (tool error)."
             }
         }
+    }
+    post {
+        always {
+            echo "📦 Archiving Bandit reports..."
+            archiveArtifacts artifacts: 'bandit-report.*', allowEmptyArchive: true
+        }
+    }
+}
 
-        stage('CODE ANALYSIS with SONARQUBE') {
+
+        stage("CODE ANALYSIS with SONARQUBE") {
             steps {
                 echo "Running SonarQube scan for Python..."
                 withSonarQubeEnv('sonar-server') {
                     sh '''
+                        set -e
                         ${SCANNER_HOME}/bin/sonar-scanner \
                             -Dsonar.projectKey=flask-banking-app \
                             -Dsonar.projectName=flask-banking-app \
@@ -115,16 +140,43 @@ pipeline {
                 }
             }
         }
+stage("Python Dependency Check Scan") {
+    steps {
+        script {
+            echo "Scanning Python dependencies for vulnerabilities..."
 
-        stage("Python Dependency Check Scan") {
-            steps {
-                echo "Scanning Python dependencies for vulnerabilities..."
-                sh '''
-                    python3 -m pip install pip-audit
-                    python3 -m pip-audit --desc > pip-audit-report.txt 
-                '''
+            // Make sure pip-audit is available (install can succeed or be already satisfied)
+            sh '''
+                python3 -m pip install --user pip-audit
+            '''
+
+            // Run pip-audit and capture exit code
+            def auditStatus = sh(
+                script: '''
+                    python3 -m pip_audit --desc > pip-audit-report.txt
+                ''',
+                returnStatus: true
+            )
+
+            if (auditStatus == 0) {
+                echo "✅ pip-audit: no known vulnerabilities found (exit code 0)."
+            } else if (auditStatus == 1) {
+                echo "⚠️ pip-audit: vulnerabilities found (exit code 1)."
+                echo "   See pip-audit-report.txt for details."
+                // Do NOT fail the pipeline here – just warn.
+            } else {
+                error "❌ pip-audit failed with exit code ${auditStatus} (tool error)."
             }
         }
+    }
+    post {
+        always {
+            echo "📦 Archiving pip-audit report..."
+            archiveArtifacts artifacts: 'pip-audit-report.txt', allowEmptyArchive: true
+        }
+    }
+}
+
 
         stage("Trivy File Scan") {
             steps {
