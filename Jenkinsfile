@@ -76,8 +76,8 @@ pipeline {
             steps {
                 echo "Running Bandit security analysis..."
                 sh '''
-                    python2 -m bandit -r . -f json -o bandit-report.json 
-                    python2 -m bandit -r . -f txt -o bandit-report.txt 
+                    python3 -m bandit -r . -f json -o bandit-report.json 
+                    python3 -m bandit -r . -f txt -o bandit-report.txt 
                 '''
             }
             post {
