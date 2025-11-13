@@ -66,8 +66,8 @@ pipeline {
             steps {
                 echo "Running integration tests and code quality checks..."
                 sh '''
-                    pylint app.py --fail-under=7.0 --exit-zero
-                    flake8 app.py --count --exit-zero --max-complexity=10 
+                    python3 -m pylint app.py --fail-under=7.0 --exit-zero
+                    python3 -m flake8 app.py --count --exit-zero --max-complexity=10 
                 '''
             }
         }
