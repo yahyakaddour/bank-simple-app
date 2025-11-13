@@ -44,31 +44,31 @@ with app.app_context():
         db.session.commit()
 
 # Decorators for access control
-def login_required(f):
+def test_login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             flash('Please log in to access this page', 'danger')
-            return redirect(url_for('login'))
+            return redirect(url_for('test_login'))
         return f(*args, **kwargs)
     return decorated_function
 
-def admin_required(f):
+def test_admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_role' not in session or session['user_role'] != 'admin':
             flash('You do not have permission to access this page', 'danger')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('test_dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
 # Routes
 @app.route('/')
-def index():
+def test_index():
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
-def login():
+def test_login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -80,7 +80,7 @@ def login():
             session['username'] = admin.username
             session['user_role'] = 'admin'
             flash('Welcome, Admin!', 'success')
-            return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('test_admin_dashboard'))
         
         # If not admin, check if it's a customer (using email as username)
         customer = Customer.query.filter_by(email=username).first()
@@ -89,31 +89,31 @@ def login():
             session['username'] = customer.full_name
             session['user_role'] = 'customer'
             flash('Welcome, Customer!', 'success')
-            return redirect(url_for('customer_dashboard'))
+            return redirect(url_for('test_customer_dashboard'))
         
         flash('Invalid credentials or inactive account', 'danger')
     
     return render_template('login.html')
 
 @app.route('/logout')
-def logout():
+def test_logout():
     session.clear()
     flash('You have been logged out', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('test_login'))
 
 @app.route('/dashboard')
-@login_required
-def dashboard():
+@test_login_required
+def test_dashboard():
     if session.get('user_role') == 'admin':
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('test_admin_dashboard'))
     else:
-        return redirect(url_for('customer_dashboard'))
+        return redirect(url_for('test_customer_dashboard'))
 
 # Admin routes
 @app.route('/admin/dashboard')
-@login_required
-@admin_required
-def admin_dashboard():
+@test_login_required
+@test_admin_required
+def test_admin_dashboard():
     admin_count = Admin.query.count()
     customer_count = Customer.query.count()
     active_customers = Customer.query.filter_by(status='active').count()
@@ -123,40 +123,38 @@ def admin_dashboard():
                           active_customers=active_customers)
 
 @app.route('/admin/admins')
-@login_required
-@admin_required
-def admin_list():
+@test_login_required
+@test_admin_required
+def test_admin_list():
     admins = Admin.query.all()
     return render_template('admin/admin_list.html', admins=admins)
 
 @app.route('/admin/admins/add', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def admin_add():
+@test_login_required
+@test_admin_required
+def test_admin_add():
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
         
-        # Validation
         if not username or not email or not password:
             flash('All fields are required', 'danger')
-            return redirect(url_for('admin_add'))
+            return redirect(url_for('test_admin_add'))
         
         if password != confirm_password:
             flash('Passwords do not match', 'danger')
-            return redirect(url_for('admin_add'))
+            return redirect(url_for('test_admin_add'))
         
         if Admin.query.filter_by(username=username).first():
             flash('Username already exists', 'danger')
-            return redirect(url_for('admin_add'))
+            return redirect(url_for('test_admin_add'))
         
         if Admin.query.filter_by(email=email).first():
             flash('Email already exists', 'danger')
-            return redirect(url_for('admin_add'))
+            return redirect(url_for('test_admin_add'))
         
-        # Create new admin
         new_admin = Admin(
             username=username,
             email=email,
@@ -166,14 +164,14 @@ def admin_add():
         db.session.commit()
         
         flash('Admin created successfully', 'success')
-        return redirect(url_for('admin_list'))
+        return redirect(url_for('test_admin_list'))
     
     return render_template('admin/admin_form.html')
 
 @app.route('/admin/admins/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def admin_edit(id):
+@test_login_required
+@test_admin_required
+def test_admin_edit(id):
     admin = Admin.query.get_or_404(id)
     
     if request.method == 'POST':
@@ -181,22 +179,20 @@ def admin_edit(id):
         email = request.form.get('email')
         password = request.form.get('password')
         
-        # Validation
         if not username or not email:
             flash('Username and email are required', 'danger')
-            return redirect(url_for('admin_edit', id=id))
+            return redirect(url_for('test_admin_edit', id=id))
         
         existing_admin = Admin.query.filter_by(username=username).first()
         if existing_admin and existing_admin.id != id:
             flash('Username already exists', 'danger')
-            return redirect(url_for('admin_edit', id=id))
+            return redirect(url_for('test_admin_edit', id=id))
         
         existing_admin = Admin.query.filter_by(email=email).first()
         if existing_admin and existing_admin.id != id:
             flash('Email already exists', 'danger')
-            return redirect(url_for('admin_edit', id=id))
+            return redirect(url_for('test_admin_edit', id=id))
         
-        # Update admin
         admin.username = username
         admin.email = email
         if password:
@@ -204,38 +200,37 @@ def admin_edit(id):
         
         db.session.commit()
         flash('Admin updated successfully', 'success')
-        return redirect(url_for('admin_list'))
+        return redirect(url_for('test_admin_list'))
     
     return render_template('admin/admin_form.html', admin=admin)
 
 @app.route('/admin/admins/delete/<int:id>', methods=['POST'])
-@login_required
-@admin_required
-def admin_delete(id):
+@test_login_required
+@test_admin_required
+def test_admin_delete(id):
     admin = Admin.query.get_or_404(id)
     
-    # Prevent deleting yourself
     if admin.id == session['user_id']:
         flash('You cannot delete your own account', 'danger')
-        return redirect(url_for('admin_list'))
+        return redirect(url_for('test_admin_list'))
     
     db.session.delete(admin)
     db.session.commit()
     flash('Admin deleted successfully', 'success')
-    return redirect(url_for('admin_list'))
+    return redirect(url_for('test_admin_list'))
 
 # Customer routes (for admin)
 @app.route('/admin/customers')
-@login_required
-@admin_required
-def customer_list():
+@test_login_required
+@test_admin_required
+def test_customer_list():
     customers = Customer.query.all()
     return render_template('admin/customer_list.html', customers=customers)
 
 @app.route('/admin/customers/add', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def customer_add():
+@test_login_required
+@test_admin_required
+def test_customer_add():
     if request.method == 'POST':
         full_name = request.form.get('full_name')
         email = request.form.get('email')
@@ -245,24 +240,21 @@ def customer_add():
         balance = float(request.form.get('balance', 0))
         status = request.form.get('status')
         
-        # Generate a unique account number (simplified for demo)
         import random
         bank_account_number = f"ACC{random.randint(10000, 99999)}"
         
-        # Validation
         if not full_name or not email or not account_type or not password:
             flash('Name, email, password and account type are required', 'danger')
-            return redirect(url_for('customer_add'))
+            return redirect(url_for('test_customer_add'))
         
         if password != confirm_password:
             flash('Passwords do not match', 'danger')
-            return redirect(url_for('customer_add'))
+            return redirect(url_for('test_customer_add'))
         
         if Customer.query.filter_by(email=email).first():
             flash('Email already exists', 'danger')
-            return redirect(url_for('customer_add'))
+            return redirect(url_for('test_customer_add'))
         
-        # Create new customer
         new_customer = Customer(
             full_name=full_name,
             email=email,
@@ -276,14 +268,14 @@ def customer_add():
         db.session.commit()
         
         flash('Customer created successfully', 'success')
-        return redirect(url_for('customer_list'))
+        return redirect(url_for('test_customer_list'))
     
     return render_template('admin/customer_form.html')
 
 @app.route('/admin/customers/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def customer_edit(id):
+@test_login_required
+@test_admin_required
+def test_customer_edit(id):
     customer = Customer.query.get_or_404(id)
     
     if request.method == 'POST':
@@ -295,21 +287,19 @@ def customer_edit(id):
         balance = float(request.form.get('balance', 0))
         status = request.form.get('status')
         
-        # Validation
         if not full_name or not email or not account_type:
             flash('Name, email and account type are required', 'danger')
-            return redirect(url_for('customer_edit', id=id))
+            return redirect(url_for('test_customer_edit', id=id))
         
         if password and password != confirm_password:
             flash('Passwords do not match', 'danger')
-            return redirect(url_for('customer_edit', id=id))
+            return redirect(url_for('test_customer_edit', id=id))
         
         existing_customer = Customer.query.filter_by(email=email).first()
         if existing_customer and existing_customer.id != id:
             flash('Email already exists', 'danger')
-            return redirect(url_for('customer_edit', id=id))
+            return redirect(url_for('test_customer_edit', id=id))
         
-        # Update customer
         customer.full_name = full_name
         customer.email = email
         customer.account_type = account_type
@@ -321,33 +311,33 @@ def customer_edit(id):
         
         db.session.commit()
         flash('Customer updated successfully', 'success')
-        return redirect(url_for('customer_list'))
+        return redirect(url_for('test_customer_list'))
     
     return render_template('admin/customer_form.html', customer=customer)
 
 @app.route('/admin/customers/delete/<int:id>', methods=['POST'])
-@login_required
-@admin_required
-def customer_delete(id):
+@test_login_required
+@test_admin_required
+def test_customer_delete(id):
     customer = Customer.query.get_or_404(id)
     db.session.delete(customer)
     db.session.commit()
     flash('Customer deleted successfully', 'success')
-    return redirect(url_for('customer_list'))
+    return redirect(url_for('test_customer_list'))
 
 # Customer dashboard
 @app.route('/customer/dashboard')
-@login_required
-def customer_dashboard():
+@test_login_required
+def test_customer_dashboard():
     if session.get('user_role') != 'customer':
         flash('Access denied', 'danger')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('test_dashboard'))
     
     customer = Customer.query.get(session['user_id'])
     return render_template('customer/dashboard.html', customer=customer)
 
 # Handler for Vercel serverless deployment
-def handler(event, context):
+def test_handler(event, context):
     return app
 
 if __name__ == '__main__':
