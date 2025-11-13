@@ -120,7 +120,7 @@ pipeline {
             steps {
                 echo "Scanning Python dependencies for vulnerabilities..."
                 sh '''
-                    pip install pip-audit
+                    python3 -m pip install pip-audit
                     python3 -m pip-audit --desc > pip-audit-report.txt 
                 '''
             }
